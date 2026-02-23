@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>TirrexBoard — Whiteboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="inkwell.css">
+</head>
+<body class="dark">
+
+<!-- ════ CANVAS ════ -->
+<div id="canvas-wrap">
+  <canvas id="grid-canvas"></canvas>
+  <canvas id="stroke-canvas"></canvas>
+  <canvas id="overlay-canvas"></canvas>
+</div>
+
+<!-- Custom cursors -->
+<div id="eraser-cursor"></div>
+<div id="laser-cursor"></div>
+
+<!-- Selection SVG overlay -->
+<svg id="selection-svg">
+  <defs>
+    <marker id="arrow-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(0,120,212,0.8)"/>
+    </marker>
+  </defs>
+  <rect id="sel-rect"
+    fill="rgba(99,132,255,0.06)" stroke="rgba(99,132,255,0.7)"
+    stroke-width="1.5" stroke-dasharray="6 4" rx="3" display="none">
+    <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="0.6s" repeatCount="indefinite"/>
+  </rect>
+  <g id="sel-handles"></g>
+</svg>
+
+<!-- ════ TOP BAR ════ -->
+<header id="top-bar">
+  <button class="tbtn" id="mobile-menu-btn" title="Menu">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <div class="logo-wrap">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/></svg>
+    </div>
+    <span class="logo-text">TirrexBoard</span>
+  </div>
+
+  <button class="tbtn" id="undo-btn" title="Undo">
+    <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>
+    <span class="tip">Undo  Ctrl+Z</span>
+  </button>
+  <button class="tbtn" id="redo-btn" title="Redo">
+    <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/></svg>
+    <span class="tip">Redo  Ctrl+Y</span>
+  </button>
+
+  <div class="vdiv"></div>
+
+  <button class="tbtn" id="history-toggle-btn" title="History">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <span class="tip">History</span>
+  </button>
+  <button class="tbtn" id="minimap-btn" title="Minimap">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="4" height="4" rx="0.5"/><rect x="13" y="7" width="4" height="4" rx="0.5"/><rect x="7" y="13" width="4" height="4" rx="0.5"/></svg>
+    <span class="tip">Minimap</span>
+  </button>
+  <button class="tbtn" id="grid-btn" title="Grid">
+    <svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+    <span class="tip">Grid  G</span>
+  </button>
+
+  <div class="tb-spacer"></div>
+
+  <span id="page-indicator">Page 1 / 1</span>
+  <span id="zoom-indicator">100%</span>
+
+  <div class="vdiv"></div>
+
+  <button class="tbtn" id="theme-btn" title="Toggle theme">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    <span class="tip">Theme</span>
+  </button>
+  <button class="tbtn" id="export-btn" title="Export PNG">
+    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    <span class="tip">Export  Ctrl+S</span>
+  </button>
+  <button class="tbtn" id="about-btn" title="About">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <span class="tip">About</span>
+  </button>
+</header>
+
+<!-- ════ LEFT TOOLBAR ════ -->
+<nav id="left-toolbar">
+
+  <div class="tb-section">
+    <div class="tool-group">
+      <button class="ibtn" id="tool-select" data-tool="select">
+        <svg viewBox="0 0 24 24"><path d="M5 3l14 9-7 1-4 7L5 3z"/></svg>
+        <span class="tip tip-r">Select  S</span>
+      </button>
+    </div>
+    <div class="tool-group">
+      <button class="ibtn" id="tool-pan" data-tool="pan">
+        <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 00-2-2 2 2 0 00-2 2M14 10V4a2 2 0 00-2-2 2 2 0 00-2 2v2M10 10.5V6a2 2 0 00-2-2 2 2 0 00-2 2v8l-2-2a2 2 0 00-2.83 2.83L4 18a6 6 0 006 3h2a8 8 0 008-8v-5a2 2 0 00-2-2 2 2 0 00-2 2v3"/></svg>
+        <span class="tip tip-r">Pan  Space</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-section">
+    <div class="tool-group" id="pen-group">
+      <button class="ibtn active" id="tool-pen" data-tool="pen">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span class="tip tip-r">Pen ▸</span>
+      </button>
+      <div class="sub-tools" id="draw-sub">
+        <div class="sub-item active" data-subtool="pen">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Pen <span class="sub-key">P</span>
+        </div>
+        <div class="sub-item" data-subtool="highlighter">
+          <svg viewBox="0 0 24 24"><path d="M3 18h13M9.34 3.34a4 4 0 015.66 5.66L10 14H6l-3 3V5a4 4 0 013.34-1.66z"/></svg>
+          Highlighter <span class="sub-key">H</span>
+        </div>
+        <div class="sub-item" data-subtool="chalk">
+          <svg viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5" stroke-width="3" stroke-linecap="round"/><line x1="19" y1="5" x2="21" y2="3"/></svg>
+          Chalk
+        </div>
+        <div class="sub-item" data-subtool="graphite">
+          <svg viewBox="0 0 24 24"><path d="M14 2l-10 10 8 8 10-10L14 2z"/><path d="M4 12l-2 2 2 6 6-2 2-2"/></svg>
+          Graphite
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-group" id="eraser-group">
+      <button class="ibtn" id="tool-eraser" data-tool="eraser">
+        <svg viewBox="0 0 24 24"><path d="M20 20H7L3 16l10-10 7 7-3 3M6.34 15.34L17 4.68"/></svg>
+        <span class="tip tip-r">Eraser ▸</span>
+      </button>
+      <div class="sub-tools" id="eraser-sub">
+        <div class="sub-item active" data-erasermode="stroke">
+          <svg viewBox="0 0 24 24"><path d="M20 20H7L3 16l10-10 7 7-3 3"/></svg>
+          Stroke Eraser
+        </div>
+        <div class="sub-item" data-erasermode="pixel">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>
+          Pixel Eraser
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <button class="ibtn" id="tool-text" data-tool="text">
+        <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        <span class="tip tip-r">Text  T</span>
+      </button>
+    </div>
+
+    <div class="tool-group">
+      <button class="ibtn" id="tool-laser" data-tool="laser">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>
+        <span class="tip tip-r">Laser  L</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-section">
+    <div class="tool-group">
+      <button class="ibtn" id="tool-shapes" data-tool="shapes">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><circle cx="17" cy="7" r="4"/><polygon points="7,14 13,22 1,22"/></svg>
+        <span class="tip tip-r">Shapes</span>
+      </button>
+    </div>
+
+    <div class="tool-group">
+      <button class="ibtn" id="smart-shape-btn">
+        <svg viewBox="0 0 24 24"><path d="M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10"/><path d="M22 22l-5-10-5 10"/><path d="M16.5 20h-3"/></svg>
+        <span class="tip tip-r">Smart Snap</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-section">
+    <div class="tool-group">
+      <button class="ibtn" id="color-btn">
+        <div id="color-ring"></div>
+        <span class="tip tip-r">Color</span>
+      </button>
+    </div>
+    <div class="tool-group">
+      <button class="ibtn" id="stroke-options-btn">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        <span class="tip tip-r">Options</span>
+      </button>
+    </div>
+    <div class="tool-group">
+      <button class="ibtn" id="image-btn">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span class="tip tip-r">Image</span>
+      </button>
+    </div>
+  </div>
+
+</nav>
+
+<!-- ════ TEXT OPTIONS BAR ════ -->
+<div id="text-toolbar">
+  <select id="text-font">
+    <option value="Inter, sans-serif">Inter</option>
+    <option value="Georgia, 'Times New Roman', serif">Serif</option>
+    <option value="'JetBrains Mono', 'Courier New', monospace">Mono</option>
+    <option value="'Brush Script MT', 'Segoe Script', cursive">Cursive</option>
+    <option value="Impact, fantasy">Fantasy</option>
+  </select>
+  <input type="number" id="text-size" value="24" min="8" max="200" title="Font size (px)">
+  <button class="tt-btn" id="text-bold" title="Bold"><strong>B</strong></button>
+  <button class="tt-btn" id="text-italic" title="Italic"><em>I</em></button>
+  <div class="tt-div"></div>
+  <button class="tt-btn" id="text-align-left" title="Align left">
+    <svg viewBox="0 0 16 16" width="14" height="14"><path d="M1 2h14M1 5.5h8M1 9h14M1 12.5h8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+  </button>
+  <button class="tt-btn active" id="text-align-center" title="Align center">
+    <svg viewBox="0 0 16 16" width="14" height="14"><path d="M1 2h14M4 5.5h8M1 9h14M4 12.5h8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+  </button>
+  <button class="tt-btn" id="text-align-right" title="Align right">
+    <svg viewBox="0 0 16 16" width="14" height="14"><path d="M1 2h14M7 5.5h8M1 9h14M7 12.5h8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+  </button>
+</div>
+
+<!-- ════ PAGES PANEL ════ -->
+<div id="pages-panel">
+  <div id="page-list" style="display:flex;gap:6px;"></div>
+  <button class="page-add-btn" id="add-page-btn" title="Add page">+</button>
+</div>
+
+<!-- ════ ZOOM BAR ════ -->
+<div id="zoom-bar">
+  <button class="zbtn" id="zoom-out-btn" title="Zoom out">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>
+  </button>
+  <span id="zoom-label">100%</span>
+  <button class="zbtn" id="zoom-in-btn" title="Zoom in">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>
+  </button>
+</div>
+
+<!-- ════ MINIMAP ════ -->
+<div id="minimap-wrap">
+  <canvas id="minimap-canvas" width="160" height="110"></canvas>
+  <div id="minimap-viewport"></div>
+</div>
+
+<!-- ════ INSPECTOR ════ -->
+<div id="inspector">
+  <h4>Selection</h4>
+  <div class="insp-row">
+    <div class="insp-label">Color</div>
+    <div id="insp-color"></div>
+  </div>
+  <div class="insp-row">
+    <div class="insp-label">Stroke width</div>
+    <div class="range-row">
+      <input type="range" id="insp-size" min="1" max="80" value="4">
+    </div>
+  </div>
+  <div class="insp-row">
+    <div class="insp-label">Opacity</div>
+    <div class="range-row">
+      <input type="range" id="insp-opacity" min="0" max="100" value="100">
+    </div>
+  </div>
+  <div class="insp-actions">
+    <button class="insp-btn" id="insp-dupe">Duplicate</button>
+    <button class="insp-btn" id="insp-bring">Fwd</button>
+    <button class="insp-btn danger" id="insp-del">Delete</button>
+  </div>
+</div>
+
+<!-- ════ HISTORY SCRUBBER ════ -->
+<div id="history-bar">
+  <label>History</label>
+  <input type="range" id="history-slider" min="0" max="0" value="0">
+  <span id="history-count">0/0</span>
+</div>
+
+<!-- ════ STROKE OPTIONS FLYOUT ════ -->
+<div id="stroke-options">
+  <div class="so-label">Pen size</div>
+  <div class="so-size-row">
+    <input type="range" id="pen-size-slider" min="1" max="80" value="6">
+    <span class="so-size-val" id="pen-size-val">6</span>
+  </div>
+  <div class="so-label">Eraser size</div>
+  <div class="so-size-row">
+    <input type="range" id="eraser-size-slider" min="4" max="120" value="24">
+    <span class="so-size-val" id="eraser-size-val">24</span>
+  </div>
+  <div class="so-label">Smoothing</div>
+  <div class="so-smooth">
+    <button class="smooth-btn" id="smooth-raw">RAW</button>
+    <button class="smooth-btn active" id="smooth-std">STD</button>
+    <button class="smooth-btn" id="smooth-arch">ARC</button>
+  </div>
+</div>
+
+<!-- ════ COLOR PICKER PANEL ════ -->
+<div id="color-picker-panel">
+  <div class="cp-label">Pick a color</div>
+  <div class="cp-presets" id="cp-presets"></div>
+  <div class="cp-row">
+    <input type="color" id="cp-native" value="#e8e6e3">
+    <input type="text" id="cp-hex" maxlength="7" placeholder="#e8e6e3">
+  </div>
+</div>
+
+<!-- ════ RADIAL MENU ════ -->
+<div id="radial-menu"></div>
+
+<!-- ════ SELECTION OVERLAY (text/image) ════ -->
+<div id="element-overlay" style="display:none;">
+  <div id="overlay-drag-handle" title="Drag to move">⠿</div>
+  <button id="overlay-edit-btn" title="Edit">✎</button>
+  <button id="overlay-delete-btn" title="Delete">✕</button>
+  <div id="overlay-resize-handles">
+    <div class="resize-dot nw" data-handle="nw"></div>
+    <div class="resize-dot n" data-handle="n"></div>
+    <div class="resize-dot ne" data-handle="ne"></div>
+    <div class="resize-dot e" data-handle="e"></div>
+    <div class="resize-dot se" data-handle="se"></div>
+    <div class="resize-dot s" data-handle="s"></div>
+    <div class="resize-dot sw" data-handle="sw"></div>
+    <div class="resize-dot w" data-handle="w"></div>
+  </div>
+</div>
+
+<!-- ════ SHAPE PICKER BAR ════ -->
+<div id="shape-bar">
+  <button class="shape-pick active" data-shape="rect" title="Rectangle (R)">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+    <span>Rect</span>
+  </button>
+  <button class="shape-pick" data-shape="circle" title="Ellipse (O)">
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="8"/></svg>
+    <span>Ellipse</span>
+  </button>
+  <button class="shape-pick" data-shape="line" title="Straight Line">
+    <svg viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+    <span>Line</span>
+  </button>
+  <button class="shape-pick" data-shape="arrow" title="Arrow">
+    <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+    <span>Arrow</span>
+  </button>
+  <button class="shape-pick" data-shape="triangle" title="Triangle">
+    <svg viewBox="0 0 24 24"><polygon points="12,3 22,21 2,21"/></svg>
+    <span>Triangle</span>
+  </button>
+  <button class="shape-pick" data-shape="diamond" title="Diamond">
+    <svg viewBox="0 0 24 24"><polygon points="12,2 22,12 12,22 2,12"/></svg>
+    <span>Diamond</span>
+  </button>
+</div>
+
+<!-- ════ MOBILE SIDEBAR ════ -->
+<div id="mobile-sidebar-overlay"></div>
+<aside id="mobile-sidebar">
+  <div class="ms-header">
+    <div class="ms-logo">
+      <div class="logo-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/></svg></div>
+      <span>TirrexBoard</span>
+    </div>
+    <button id="mobile-sidebar-close">&times;</button>
+  </div>
+
+  <div class="ms-body">
+    <div class="ms-section">
+      <div class="ms-label">Tools</div>
+      <button class="ms-btn" data-ms-tool="select">
+        <svg viewBox="0 0 24 24"><path d="M5 3l14 9-7 1-4 7L5 3z"/></svg>
+        <span>Select</span>
+      </button>
+      <button class="ms-btn" data-ms-tool="pan">
+        <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 00-2-2 2 2 0 00-2 2M14 10V4a2 2 0 00-2-2 2 2 0 00-2 2v2M10 10.5V6a2 2 0 00-2-2 2 2 0 00-2 2v8l-2-2a2 2 0 00-2.83 2.83L4 18a6 6 0 006 3h2a8 8 0 008-8v-5a2 2 0 00-2-2 2 2 0 00-2 2v3"/></svg>
+        <span>Pan</span>
+      </button>
+    </div>
+
+    <div class="ms-divider"></div>
+
+    <div class="ms-section">
+      <div class="ms-label">Drawing</div>
+      <button class="ms-btn active" data-ms-tool="pen" data-ms-sub="pen">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span>Pen</span>
+      </button>
+      <button class="ms-btn" data-ms-tool="pen" data-ms-sub="highlighter">
+        <svg viewBox="0 0 24 24"><path d="M3 18h13M9.34 3.34a4 4 0 015.66 5.66L10 14H6l-3 3V5a4 4 0 013.34-1.66z"/></svg>
+        <span>Highlighter</span>
+      </button>
+      <button class="ms-btn" data-ms-tool="pen" data-ms-sub="chalk">
+        <svg viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5" stroke-width="3" stroke-linecap="round"/><line x1="19" y1="5" x2="21" y2="3"/></svg>
+        <span>Chalk</span>
+      </button>
+      <button class="ms-btn" data-ms-tool="pen" data-ms-sub="graphite">
+        <svg viewBox="0 0 24 24"><path d="M14 2l-10 10 8 8 10-10L14 2z"/><path d="M4 12l-2 2 2 6 6-2 2-2"/></svg>
+        <span>Graphite</span>
+      </button>
+    </div>
+
+    <div class="ms-divider"></div>
+
+    <div class="ms-section">
+      <div class="ms-label">Eraser</div>
+      <button class="ms-btn" data-ms-tool="eraser" data-ms-eraser="stroke">
+        <svg viewBox="0 0 24 24"><path d="M20 20H7L3 16l10-10 7 7-3 3"/></svg>
+        <span>Stroke Eraser</span>
+      </button>
+      <button class="ms-btn" data-ms-tool="eraser" data-ms-eraser="pixel">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="16" y1="8" x2="8" y2="16"/></svg>
+        <span>Pixel Eraser</span>
+      </button>
+    </div>
+
+    <div class="ms-divider"></div>
+
+    <div class="ms-section">
+      <div class="ms-label">Insert</div>
+      <button class="ms-btn" data-ms-tool="text">
+        <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        <span>Text</span>
+      </button>
+      <button class="ms-btn" data-ms-action="image">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span>Image</span>
+      </button>
+      <button class="ms-btn" data-ms-tool="laser">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41"/></svg>
+        <span>Laser Pointer</span>
+      </button>
+    </div>
+
+    <div class="ms-divider"></div>
+
+    <div class="ms-section">
+      <div class="ms-label">Shapes</div>
+      <div class="ms-shapes-grid">
+        <button class="ms-shape-btn active" data-ms-shape="rect">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          <span>Rect</span>
+        </button>
+        <button class="ms-shape-btn" data-ms-shape="circle">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="8"/></svg>
+          <span>Ellipse</span>
+        </button>
+        <button class="ms-shape-btn" data-ms-shape="line">
+          <svg viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+          <span>Line</span>
+        </button>
+        <button class="ms-shape-btn" data-ms-shape="arrow">
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+          <span>Arrow</span>
+        </button>
+        <button class="ms-shape-btn" data-ms-shape="triangle">
+          <svg viewBox="0 0 24 24"><polygon points="12,3 22,21 2,21"/></svg>
+          <span>Triangle</span>
+        </button>
+        <button class="ms-shape-btn" data-ms-shape="diamond">
+          <svg viewBox="0 0 24 24"><polygon points="12,2 22,12 12,22 2,12"/></svg>
+          <span>Diamond</span>
+        </button>
+      </div>
+      <button class="ms-btn" data-ms-action="smartsnap">
+        <svg viewBox="0 0 24 24"><path d="M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10"/><path d="M22 22l-5-10-5 10"/><path d="M16.5 20h-3"/></svg>
+        <span>Smart Snap</span>
+        <span class="ms-badge" id="ms-snap-badge">OFF</span>
+      </button>
+    </div>
+
+    <div class="ms-divider"></div>
+
+    <div class="ms-section">
+      <div class="ms-label">Style</div>
+      <button class="ms-btn" data-ms-action="color">
+        <div class="ms-color-dot" id="ms-color-dot"></div>
+        <span>Color</span>
+      </button>
+      <button class="ms-btn" data-ms-action="options">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        <span>Pen &amp; Eraser Size</span>
+      </button>
+    </div>
+
+    <div class="ms-divider"></div>
+
+    <div class="ms-section">
+      <div class="ms-label">View</div>
+      <button class="ms-btn" data-ms-action="grid">
+        <svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+        <span>Grid</span>
+        <span class="ms-badge" id="ms-grid-badge">OFF</span>
+      </button>
+      <button class="ms-btn" data-ms-action="history">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>History</span>
+      </button>
+      <button class="ms-btn" data-ms-action="minimap">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="4" height="4" rx="0.5"/><rect x="13" y="7" width="4" height="4" rx="0.5"/><rect x="7" y="13" width="4" height="4" rx="0.5"/></svg>
+        <span>Minimap</span>
+      </button>
+      <button class="ms-btn" data-ms-action="theme">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <span>Toggle Theme</span>
+      </button>
+      <button class="ms-btn" data-ms-action="export">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        <span>Export PNG</span>
+      </button>
+      <button class="ms-btn" data-ms-action="about">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>About</span>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- ════ ABOUT MODAL ════ -->
+<div id="about-overlay">
+  <div id="about-modal">
+    <button id="about-close">&times;</button>
+    <div class="about-logo">
+      <div class="about-logo-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/></svg>
+      </div>
+      <div class="about-title">TirrexBoard</div>
+    </div>
+    <p class="about-desc">A modern whiteboard for creative minds. Draw, sketch, annotate, and collaborate with precision tools.</p>
+    <div class="about-divider"></div>
+    <div class="about-credit">
+      <span class="about-label">Created by</span>
+      <a href="https://t.me/tanvirahamedtonmoy" target="_blank" rel="noopener" class="about-author">Tanvir Ahamed Tonmoy</a>
+    </div>
+    <div class="about-copy">&copy; 2026 Tanvir Ahamed Tonmoy. All rights reserved.</div>
+  </div>
+</div>
+
+<!-- ════ NOTIFICATION ════ -->
+<div id="notif"></div>
+
+<!-- Hidden file input -->
+<input type="file" id="image-input" accept="image/*" style="display:none">
+
+<script src="inkwell.js"></script>
+</body>
+</html>
